@@ -321,6 +321,11 @@ void displayFunc()
   glDrawArrays(GL_TRIANGLES, 0, rightTrianglesVertices.size()/3+leftTrianglesVertices.size()/3+upTrianglesVertices.size()/3+downTrianglesVertices.size()/3);
 
   // texturePipelineProgram->Bind();
+  texturePipelineProgram->Bind();
+
+  // set variable
+  texturePipelineProgram->SetModelViewMatrix(m);
+  texturePipelineProgram->SetProjectionMatrix(p);
 
   // // set variable
   // texturePipelineProgram->SetModelViewMatrix(m);
@@ -331,7 +336,7 @@ void displayFunc()
     // loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "tc");
     // glEnableVertexAttribArray(loc);
     // glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(groundVertices.size()*sizeof(float)));
-
+  glBindTexture(GL_TEXTURE_2D, groundTextHandle);
   glBindVertexArray(level4VertexArray);
   glDrawArrays(GL_TRIANGLES, 0, groundVertices.size()/3);
   // glBindVertexArray(normalsVertexArray);
@@ -617,48 +622,6 @@ void keyboardFunc(unsigned char key, int x, int y)
   }
 }
 
-void calculateSpline(vector<double>& p1, vector<double>& p2, vector<double>& p3, vector<double>& p4) {
-    vector<double> c1,c2,c3, c4;
-
-    c1.push_back((-0.5 * p1[0]) + (1.5 * p2[0]) + (-1.5 * p3[0]) + (0.5 * p4[0]));
-    c1.push_back((-0.5 * p1[1]) + (1.5 * p2[1]) + (-1.5 * p3[1]) + (0.5 * p4[1]));
-    c1.push_back((-0.5 * p1[2]) + (1.5 * p2[2]) + (-1.5 * p3[2]) + (0.5 * p4[2]));
-
-    c2.push_back(p1[0] + (-2.5 * p2[0]) + (3 * p3[0]) + (-0.5 * p4[0]));
-    c2.push_back(p1[1] + (-2.5 * p2[1]) + (3 * p3[1]) + (-0.5 * p4[1]));
-    c2.push_back(p1[2] + (-2.5 * p2[2]) + (3 * p3[2]) + (-0.5 * p4[2]));
-
-    c3.push_back((-0.5 * p1[0]) + (0.5 * p3[0]));
-    c3.push_back((-0.5 * p1[1]) + (0.5 * p3[1]));
-    c3.push_back((-0.5 * p1[2]) + (0.5 * p3[2]));
-
-    c4.push_back((1.0 * p2[0]));
-    c4.push_back((1.0 * p2[1]));
-    c4.push_back((1.0 * p2[2]));
-
-    double x = -100,y= -100,z=-100, oldX, oldY, oldZ;
-    for(double u = 0; u <= 1; u+=0.001) {
-      x = (pow(u, 3) * c1[0])+(pow(u, 2) * c2[0])+(u * c3[0])+c4[0];
-      y = (pow(u, 3) * c1[1])+(pow(u, 2) * c2[1])+(u * c3[1])+c4[1];
-      z = (pow(u, 3) * c1[2])+(pow(u, 2) * c2[2])+(u * c3[2])+c4[2];
-      level1Vertices.push_back(x);
-      level1Vertices.push_back(y);
-      level1Vertices.push_back(z);
-      oldX = x; 
-      oldY = y; 
-      oldZ = z;
-      if(level1Vertices.size() > 3) {
-        level1Vertices.push_back(x);
-        level1Vertices.push_back(y);
-        level1Vertices.push_back(z);
-      }
-      level1Color.push_back(0.0f);
-      level1Color.push_back(0.0f);
-      level1Color.push_back(0.0f);
-      cout << "x: " << x << " y: " << y  << " z: " << z << endl;
-    }
-}
-
 vector<float> calculateNormal(vector<float>& a, vector<float>& b ,vector<float>& c){
 	vector<float> v1 = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
 	vector<float> v2 = {c[0] - b[0], c[1] - b[1], c[2] - b[2]};
@@ -858,7 +821,6 @@ void readSpline(char *file) {
           leftTrianglesVertices1.push_back(v7);
           leftTrianglesVertices1.push_back(v3);
           // addTriangleColor(clr);
-
         }
         
         v0 = v4;
@@ -868,30 +830,10 @@ void readSpline(char *file) {
       }
     }
 }
-
-
-      for(int i = 0; i < rightTrianglesVertices1.size(); i++) {
-        cout << "x: " << rightTrianglesVertices1[i][0] << endl;
-        cout << "y: " << rightTrianglesVertices1[i][1] << endl;
-        cout << "z: " << rightTrianglesVertices1[i][2] << endl;
-        rightTrianglesVertices.push_back(rightTrianglesVertices1[i][0]);
-        rightTrianglesVertices.push_back(rightTrianglesVertices1[i][1]);
-        rightTrianglesVertices.push_back(rightTrianglesVertices1[i][2]);
-      }
       for(int i = 0; i < leftTrianglesVertices1.size(); i++) {
         leftTrianglesVertices.push_back(leftTrianglesVertices1[i][0]);
         leftTrianglesVertices.push_back(leftTrianglesVertices1[i][1]);
         leftTrianglesVertices.push_back(leftTrianglesVertices1[i][2]);
-      }
-      for(int i = 0; i < upTrianglesVertices1.size(); i++) {
-        upTrianglesVertices.push_back(upTrianglesVertices1[i][0]);
-        upTrianglesVertices.push_back(upTrianglesVertices1[i][1]);
-        upTrianglesVertices.push_back(upTrianglesVertices1[i][2]);
-      }
-      for(int i = 0; i < downTrianglesVertices1.size(); i++) {
-        downTrianglesVertices.push_back(downTrianglesVertices1[i][0]);
-        downTrianglesVertices.push_back(downTrianglesVertices1[i][1]);
-        downTrianglesVertices.push_back(downTrianglesVertices1[i][2]);
       }
 }
 
@@ -905,29 +847,29 @@ void loadTexture(const char* imgName, GLuint& texHandle) {
 }
 
 void initGround() {
+  groundVertices.push_back(-1000);
   groundVertices.push_back(-10);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(-10);
+  groundVertices.push_back(-1000);
 
-  groundVertices.push_back(10);
+  groundVertices.push_back(1000);
   groundVertices.push_back(-10);
-  groundVertices.push_back(-10);
+  groundVertices.push_back(-1000);
 
+  groundVertices.push_back(-1000);
   groundVertices.push_back(-10);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(10);
+  groundVertices.push_back(1000);
 
-  groundVertices.push_back(10);
+  groundVertices.push_back(1000);
   groundVertices.push_back(-10);
-  groundVertices.push_back(-10);
+  groundVertices.push_back(-1000);
 
+  groundVertices.push_back(-1000);
   groundVertices.push_back(-10);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(10);
+  groundVertices.push_back(1000);
 
-  groundVertices.push_back(10);
+  groundVertices.push_back(1000);
   groundVertices.push_back(-10);
-  groundVertices.push_back(10);
+  groundVertices.push_back(1000);
 
   groundPTex.push_back(0);
   groundPTex.push_back(1);
@@ -984,9 +926,9 @@ void initScene(int argc, char *argv[])
     //textures
     glGenBuffers(1, &level4VertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, level4VertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, (groundVertices.size()) * sizeof(float), groundVertices.data(), GL_STATIC_DRAW);
-    // glBufferSubData(GL_ARRAY_BUFFER, 0,groundVertices.size() * sizeof(float),groundVertices.data());
-    // glBufferSubData(GL_ARRAY_BUFFER,groundVertices.size() * sizeof(float), groundPTex.size() * sizeof(float), groundPTex.data());
+    glBufferData(GL_ARRAY_BUFFER, (groundVertices.size()+groundPTex.size()) * sizeof(float), groundVertices.data(), GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,groundVertices.size() * sizeof(float),groundVertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER,groundVertices.size() * sizeof(float), groundPTex.size() * sizeof(float), groundPTex.data());
     // glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices[0]) * groundVertices.size(), &groundVertices[0], GL_STATIC_DRAW);
 
 
@@ -995,9 +937,9 @@ void initScene(int argc, char *argv[])
     pipelineProgram = new BasicPipelineProgram;
     int ret = pipelineProgram->Init(shaderBasePath);
     if (ret != 0) abort();
-    // texturePipelineProgram = new TexturePipelineProgram;
-    // ret = texturePipelineProgram->Init(shaderBasePath);
-    // if (ret != 0) abort();
+    texturePipelineProgram = new TexturePipelineProgram;
+    ret = texturePipelineProgram->Init(shaderBasePath);
+    if (ret != 0) abort();
 
    
 
@@ -1045,7 +987,7 @@ void initScene(int argc, char *argv[])
     // glBindTexture(GL_TEXTURE_2D, groundTextHandle);
     glBindVertexArray(level4VertexArray);
     glBindBuffer(GL_ARRAY_BUFFER, level4VertexBuffer);
-    loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "position");
+    loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "position");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
@@ -1058,9 +1000,9 @@ void initScene(int argc, char *argv[])
     // glEnableVertexAttribArray(loc);
     // glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
-    // loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "tc");
-    // glEnableVertexAttribArray(loc);
-    // glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(groundVertices.size()*sizeof(float)));
+    loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "texCoord");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(groundVertices.size()*sizeof(float)));
 
 
   glEnable(GL_DEPTH_TEST);

@@ -285,14 +285,10 @@ void displayFunc()
 
   matrix.SetMatrixMode(OpenGLMatrix::ModelView);
   matrix.LoadIdentity();
-  // if(countLook < -100) countLook = 100;
-  
-  // int count = 100;
-  // while(count  >0 ) {
-    matrix.LookAt(ex, ey, ez, fx, fy, fz, ux, uy, uz);
+  matrix.LookAt(ex, ey, ez, fx, fy, fz, ux, uy, uz);
     // matrix.LookAt(0, 0, 5, 0, 0, 0, 0, 1, 0);
     //  matrix.LookAt(13.5939, -0.0539935, 0.56969, 0, 0, 0, 0, 1, 0);
-  // }
+  
   //light
   pipelineProgram->Bind();
   float view[16];
@@ -300,16 +296,37 @@ void displayFunc()
 
   GLuint program = pipelineProgram->GetProgramHandle();
   GLint h_viewLightDirection = glGetUniformLocation(program, "viewLightDirection");
+  GLint ka = glGetUniformLocation(program, "ka");
+  GLint kd = glGetUniformLocation(program, "kd");
+  GLint ks = glGetUniformLocation(program, "ks");
+  GLint alpha = glGetUniformLocation(program, "alpha");
+  GLint La = glGetUniformLocation(program, "La");
+  GLint Ld = glGetUniformLocation(program, "Ld");
+  GLint Ls = glGetUniformLocation(program, "Ls");
+  float mat_ambient[] ={ 0.23125f, 0.23125f, 0.23125f, 1.0f };
+  float mat_diffuse[] ={0.2775f, 0.2775f, 0.2775f, 1.0f };
+  float mat_specular[] ={0.773911f, 0.773911f, 0.773911f, 1.0f };
+  float shine =51.2f ;
+  float light_ambient[] = {0.5f,0.5f,0.5f,1.0f};//{ 0.24725f, 0.1995f, 0.0745f, 1.0f };
+  float light_diffuse[] = {0.75164f, 0.75164f, 0.75164f, 1.0f };
+  float light_specular[] = {0.5f,0.5f,0.5,1.0f};//{0.628281f, 0.555802f, 0.366065f, 1.0f };
   // float lightDirection[3] = {0,1,0};
   float lightDirection[3] = { 0, 1, 0 }; // the “Sun” at noon 
   float viewLightDirection[3]; // light direction in the view space 
   // the following line is pseudo-code: 
   // viewLightDirection = (view * glm::vec4(lightDirection, 0.0)).xyz; 
-  viewLightDirection[0] = 0.7;//= (view[0] * lightDirection[0]) + (view[1] * lightDirection[1]) + (view[2] * lightDirection[2]);
-  viewLightDirection[1] = 0.7;//= (view[4] * lightDirection[0]) + (view[5] * lightDirection[1]) + (view[6] * lightDirection[2]);
-  viewLightDirection[2] = 0.7;//= (view[8] * lightDirection[0]) + (view[9] * lightDirection[1]) + (view[10] * lightDirection[2]);
+  viewLightDirection[0] = (view[0] * lightDirection[0]) + (view[1] * lightDirection[1]) + (view[2] * lightDirection[2]);
+  viewLightDirection[1] = (view[4] * lightDirection[0]) + (view[5] * lightDirection[1]) + (view[6] * lightDirection[2]);
+  viewLightDirection[2] = (view[8] * lightDirection[0]) + (view[9] * lightDirection[1]) + (view[10] * lightDirection[2]);
   // upload viewLightDirection to the GPU 
   glUniform3fv(h_viewLightDirection, 1, viewLightDirection); 
+  glUniform4fv(La, 1, light_ambient);
+  glUniform4fv(Ld, 1, light_diffuse);
+  glUniform4fv(Ls, 1, light_specular);
+  glUniform4fv(ka, 1, mat_ambient);
+  glUniform4fv(kd, 1, mat_diffuse);
+  glUniform4fv(ks, 1, mat_specular);
+  glUniform1f(alpha, shine);
   matrix.Translate(landTranslate[0],landTranslate[1], landTranslate[2]);
   matrix.Rotate(landRotate[0], 1,0,0);
   matrix.Rotate(landRotate[1], 0,1,0);
@@ -416,8 +433,8 @@ void idleFunc()
   // }
 
   if(uCamera < level1Vertices.size()-1) {
-    ex = spinePoints[uCamera2].x+0.03 * spineNorms[uCamera2].x;
     ey = spinePoints[uCamera2].y+0.03 * spineNorms[uCamera2].y;
+    ex = spinePoints[uCamera2].x+0.03 * spineNorms[uCamera2].x;
     ez = spinePoints[uCamera2].z+0.03 * spineNorms[uCamera2].z;
     
     float tanx = spineTan[uCamera2].x;//+0.03* spineNorms[uCamera2].x;

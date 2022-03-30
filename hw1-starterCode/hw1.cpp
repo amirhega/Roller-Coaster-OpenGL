@@ -293,23 +293,43 @@ void displayFunc()
     // matrix.LookAt(0, 0, 5, 0, 0, 0, 0, 1, 0);
     //  matrix.LookAt(13.5939, -0.0539935, 0.56969, 0, 0, 0, 0, 1, 0);
   // }
+  //light
+  pipelineProgram->Bind();
+  float view[16];
+  matrix.GetMatrix(view);
+
+  GLuint program = pipelineProgram->GetProgramHandle();
+  GLint h_viewLightDirection = glGetUniformLocation(program, "viewLightDirection");
+  // float lightDirection[3] = {0,1,0};
+  float lightDirection[3] = { 0, 1, 0 }; // the “Sun” at noon 
+  float viewLightDirection[3]; // light direction in the view space 
+  // the following line is pseudo-code: 
+  // viewLightDirection = (view * glm::vec4(lightDirection, 0.0)).xyz; 
+  viewLightDirection[0] = 0.7;//= (view[0] * lightDirection[0]) + (view[1] * lightDirection[1]) + (view[2] * lightDirection[2]);
+  viewLightDirection[1] = 0.7;//= (view[4] * lightDirection[0]) + (view[5] * lightDirection[1]) + (view[6] * lightDirection[2]);
+  viewLightDirection[2] = 0.7;//= (view[8] * lightDirection[0]) + (view[9] * lightDirection[1]) + (view[10] * lightDirection[2]);
+  // upload viewLightDirection to the GPU 
+  glUniform3fv(h_viewLightDirection, 1, viewLightDirection); 
   matrix.Translate(landTranslate[0],landTranslate[1], landTranslate[2]);
   matrix.Rotate(landRotate[0], 1,0,0);
   matrix.Rotate(landRotate[1], 0,1,0);
   matrix.Rotate(landRotate[2], 0,0,1);// landRotate[0], landRotate[1], landRotate[2]);
   matrix.Scale(landScale[0],landScale[1],landScale[2]);
 
-
+  GLint h_normalMatrix = glGetUniformLocation(program, "normalMatrix");
   float m[16];
   matrix.SetMatrixMode(OpenGLMatrix::ModelView);
   matrix.GetMatrix(m);
+
+  GLboolean isRowMajor = GL_FALSE;
+  glUniformMatrix4fv(h_normalMatrix, 1, isRowMajor, m);
 
   float p[16];
   matrix.SetMatrixMode(OpenGLMatrix::Projection);
   matrix.GetMatrix(p);
   
   // bind shader
-  pipelineProgram->Bind();
+  
 
   // set variable
   pipelineProgram->SetModelViewMatrix(m);
@@ -327,15 +347,6 @@ void displayFunc()
   texturePipelineProgram->SetModelViewMatrix(m);
   texturePipelineProgram->SetProjectionMatrix(p);
 
-  // // set variable
-  // texturePipelineProgram->SetModelViewMatrix(m);
-  // texturePipelineProgram->SetProjectionMatrix(p);
-  //textures
-    
-
-    // loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "tc");
-    // glEnableVertexAttribArray(loc);
-    // glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(groundVertices.size()*sizeof(float)));
   glBindTexture(GL_TEXTURE_2D, groundTextHandle);
   glBindVertexArray(level4VertexArray);
   glDrawArrays(GL_TRIANGLES, 0, groundVertices.size()/3);
@@ -626,27 +637,32 @@ vector<float> calculateNormal(vector<float>& a, vector<float>& b ,vector<float>&
 	vector<float> v1 = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
 	vector<float> v2 = {c[0] - b[0], c[1] - b[1], c[2] - b[2]};
   vector<float> d;
-  d.push_back(v1[1]*v2[2] - v1[2]*v2[1]);
-  d.push_back(v1[2]*v2[1] - v1[1]*v2[2]);
-  d.push_back(v1[1]*v2[1] - v1[1]*v2[1]);// = crossProduct(v1,v2);
-	return d;
+  return unitCross(v1[0],v1[1],v1[2], v2[0],v2[1],v2[2]);
+  // c.push_back(a2*b3 - a3*b2);
+  // c.push_back(a3*b1 - a1*b3);
+  // c.push_back(a1*b2 - a2*b1);
+  // d.push_back(v1[1]*v2[2] - v1[2]*v2[1]);
+  // d.push_back(v1[2]*v2[0] - v1[0]*v2[2]);
+  // d.push_back(v1[0]*v2[1] - v1[1]*v2[0]);
+	// return d;
 }
 
 void addTriangleColor(vector<float> color) {
+  cout << color[0] << endl;
   leftTriangleColors.push_back(color[0]);
   leftTriangleColors.push_back(color[1]);
   leftTriangleColors.push_back(color[2]);
-  leftTriangleColors.push_back(1.0f);
+  // leftTriangleColors.push_back(1.0f);
 
   leftTriangleColors.push_back(color[0]);
   leftTriangleColors.push_back(color[1]);
   leftTriangleColors.push_back(color[2]);
-  leftTriangleColors.push_back(1.0f);
+  // leftTriangleColors.push_back(1.0f);
 
   leftTriangleColors.push_back(color[0]);
   leftTriangleColors.push_back(color[1]);
   leftTriangleColors.push_back(color[2]);  
-  leftTriangleColors.push_back(1.0f);
+  // leftTriangleColors.push_back(1.0f);
 }
 
 double s = 0.5;
@@ -781,46 +797,53 @@ void readSpline(char *file) {
           leftTrianglesVertices1.push_back(v6);
           leftTrianglesVertices1.push_back(v2);
           leftTrianglesVertices1.push_back(v1);
-          // vector<float> clr = calculateNormal(v6,v2,v1);
-          // addTriangleColor(clr);
+          vector<float> clr = calculateNormal(v6,v2,v1);
+          addTriangleColor(clr);
 
           leftTrianglesVertices1.push_back(v6);
           leftTrianglesVertices1.push_back(v5);
           leftTrianglesVertices1.push_back(v1);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v1,v5,v6);
+          addTriangleColor(clr);
 
 
           leftTrianglesVertices1.push_back(v5);
           leftTrianglesVertices1.push_back(v1);
           leftTrianglesVertices1.push_back(v0);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v5,v1, v0);
+          addTriangleColor(clr);
 
           leftTrianglesVertices1.push_back(v5);
           leftTrianglesVertices1.push_back(v4);
           leftTrianglesVertices1.push_back(v0);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v0,v4,v5);
+          addTriangleColor(clr);
 
 
           leftTrianglesVertices1.push_back(v7);
           leftTrianglesVertices1.push_back(v3);
           leftTrianglesVertices1.push_back(v0);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v7,v3,v0);
+          addTriangleColor(clr);
 
           leftTrianglesVertices1.push_back(v7);
           leftTrianglesVertices1.push_back(v4);
           leftTrianglesVertices1.push_back(v0);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v0,v4,v7);
+          addTriangleColor(clr);
 
 
           leftTrianglesVertices1.push_back(v6);
           leftTrianglesVertices1.push_back(v2);
           leftTrianglesVertices1.push_back(v3);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v6,v2,v3);
+          addTriangleColor(clr);
 
           leftTrianglesVertices1.push_back(v6);
           leftTrianglesVertices1.push_back(v7);
           leftTrianglesVertices1.push_back(v3);
-          // addTriangleColor(clr);
+          clr = calculateNormal(v3,v7,v6);
+          addTriangleColor(clr);
         }
         
         v0 = v4;
@@ -895,7 +918,7 @@ void initScene(int argc, char *argv[])
 {
   
   //HW2
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
   loadTexture("ground.jpg", groundTextHandle);
   
   readSpline(argv[1]);
@@ -911,9 +934,9 @@ void initScene(int argc, char *argv[])
     glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(leftTrianglesVertices[0]) * leftTrianglesVertices.size(), leftTrianglesVertices.data(), GL_STATIC_DRAW);
 
-    //  glGenBuffers(1, &trianglesColorVertexBuffer);
-    // glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(leftTriangleColors[0]) * leftTriangleColors.size(), &leftTriangleColors[0], GL_STATIC_DRAW);
+     glGenBuffers(1, &trianglesColorVertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(leftTriangleColors[0]) * leftTriangleColors.size(), &leftTriangleColors[0], GL_STATIC_DRAW);
 
     glGenBuffers(1, &normalsVertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, normalsVertexBuffer);
@@ -929,9 +952,6 @@ void initScene(int argc, char *argv[])
     glBufferData(GL_ARRAY_BUFFER, (groundVertices.size()+groundPTex.size()) * sizeof(float), groundVertices.data(), GL_STATIC_DRAW);
     glBufferSubData(GL_ARRAY_BUFFER, 0,groundVertices.size() * sizeof(float),groundVertices.data());
     glBufferSubData(GL_ARRAY_BUFFER,groundVertices.size() * sizeof(float), groundPTex.size() * sizeof(float), groundPTex.data());
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(groundVertices[0]) * groundVertices.size(), &groundVertices[0], GL_STATIC_DRAW);
-
-
 
     //BUILDS PIPELINE
     pipelineProgram = new BasicPipelineProgram;
@@ -963,10 +983,10 @@ void initScene(int argc, char *argv[])
     loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "position");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
-    // glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer);
-    // loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "color");
-    // glEnableVertexAttribArray(loc);
-    // glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+    glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer);
+    loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "normal");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
     //normals
     glGenVertexArrays(1, &normalsVertexArray);
@@ -990,15 +1010,6 @@ void initScene(int argc, char *argv[])
     loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "position");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
-
-    //textures
-    // glGenVertexArrays(1, &level4VertexArray);
-    // glBindTexture(GL_TEXTURE_2D, groundTextHandle);
-    // glBindVertexArray(level4VertexArray);
-    // glBindBuffer(GL_ARRAY_BUFFER, level4VertexBuffer);
-    // loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "position");
-    // glEnableVertexAttribArray(loc);
-    // glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
     loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "texCoord");
     glEnableVertexAttribArray(loc);

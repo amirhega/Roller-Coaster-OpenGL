@@ -76,8 +76,9 @@ GLuint downTrianglesVertexBuffer, downTrianglesColorVertexBuffer;
 GLuint level1VertexBuffer, level1ColorVertexBuffer, binormalsVertexBuffer, normalsVertexBuffer;
 GLuint level1VertexArray, level3VertexArray, normalsVertexArray, binormalsVertexArray;
 GLuint level4VertexArray, level4VertexBuffer;
+GLuint skyVertexArray, skyVertexBuffer;
 
-GLuint groundTextHandle;
+GLuint groundTextHandle, skyTextHandle;
 
 
 vector<vector<float> > leftTrianglesVertices1;
@@ -95,6 +96,7 @@ vector<float> xCam, yCam, zCam;
 vector<float> bTemp;
 vector<float> binormal, normals;
 vector<float> groundVertices, groundPTex;
+vector<float> skyVertices, skyPTex;
 
 
 int hundreds = 0, tens = 0, ones = 0;
@@ -102,6 +104,7 @@ int stall = 0;
 int countLook =100;
 int uCamera = 0, uCamera2 = 0;
 float ex=0,ey=0,ez=0,fx=0,fy=0,fz=0, ux=0.001,uy=0.001,uz=0.001, bx=0,by=0,bz=0;
+float containerSize = 100;
 
 
 OpenGLMatrix matrix;
@@ -278,6 +281,27 @@ void saveScreenshot(const char * filename)
   delete [] screenshotData;
 }
 
+void loadTexture(const char* imgName, GLuint& texHandle) {
+  // create an integer handle for the texture 
+  glGenTextures(1, &texHandle);
+  cout << "tex: " << texHandle;
+  int code = initTexture(imgName, texHandle); 
+  if (code != 0) {
+    cout << "Error loading the texture image.\n";
+    exit(EXIT_FAILURE); 
+  } 
+}
+
+void setTextureUnit(GLint unit) {
+  GLuint program = texturePipelineProgram->GetProgramHandle();
+  glActiveTexture(unit); // select texture unit affected by subsequent texture calls
+  // get a handle to the “textureImage” shader variable
+  GLint h_textureImage = glGetUniformLocation(program, "textureImage");
+  // deem the shader variable “textureImage” to read from texture unit “unit”
+  glUniform1i(h_textureImage, unit - GL_TEXTURE0);
+}
+
+
 void displayFunc()
 {
   // render some stuff...
@@ -363,10 +387,26 @@ void displayFunc()
   // set variable
   texturePipelineProgram->SetModelViewMatrix(m);
   texturePipelineProgram->SetProjectionMatrix(p);
+  
 
   glBindTexture(GL_TEXTURE_2D, groundTextHandle);
   glBindVertexArray(level4VertexArray);
   glDrawArrays(GL_TRIANGLES, 0, groundVertices.size()/3);
+  glBindVertexArray(0);
+
+
+  
+  cout << "GROUND: " << groundTextHandle;
+  cout << endl << "SKy: " << skyTextHandle;
+ glBindTexture(GL_TEXTURE_2D, skyTextHandle);
+
+ 
+
+   glBindVertexArray(skyVertexArray);
+  glDrawArrays(GL_TRIANGLES, 0, skyVertices.size()/3);
+  glBindVertexArray(0);
+
+ 
   // glBindVertexArray(normalsVertexArray);
   // glDrawArrays(GL_LINES, 0, normals.size()/2);
   // glBindVertexArray(binormalsVertexArray);
@@ -447,10 +487,10 @@ void idleFunc()
     ux = spineNorms[uCamera2].x;
     uy = spineNorms[uCamera2].y;
     uz = spineNorms[uCamera2].z;
-    cout << "E: "<< ex << " " << ey << " " << ez << " " <<endl;
-    cout << "F: "<< fx << " " << fy << " " << fz << " " <<endl;
-    cout << "U: "<< ux << " " << uy << " " << uz << " " <<endl;
-    uCamera2++;
+    // cout << "E: "<< ex << " " << ey << " " << ez << " " <<endl;
+    // cout << "F: "<< fx << " " << fy << " " << fz << " " <<endl;
+    // cout << "U: "<< ux << " " << uy << " " << uz << " " <<endl;
+    uCamera2+= 1;
   }
   // for example, here, you can save the screenshots to disk (to make the animation)
     // saveScreenshot("temp.jpg");
@@ -655,17 +695,10 @@ vector<float> calculateNormal(vector<float>& a, vector<float>& b ,vector<float>&
 	vector<float> v2 = {c[0] - b[0], c[1] - b[1], c[2] - b[2]};
   vector<float> d;
   return unitCross(v1[0],v1[1],v1[2], v2[0],v2[1],v2[2]);
-  // c.push_back(a2*b3 - a3*b2);
-  // c.push_back(a3*b1 - a1*b3);
-  // c.push_back(a1*b2 - a2*b1);
-  // d.push_back(v1[1]*v2[2] - v1[2]*v2[1]);
-  // d.push_back(v1[2]*v2[0] - v1[0]*v2[2]);
-  // d.push_back(v1[0]*v2[1] - v1[1]*v2[0]);
-	// return d;
 }
 
 void addTriangleColor(vector<float> color) {
-  cout << color[0] << endl;
+  // cout << color[0] << endl;
   leftTriangleColors.push_back(color[0]);
   leftTriangleColors.push_back(color[1]);
   leftTriangleColors.push_back(color[2]);
@@ -767,7 +800,7 @@ void readSpline(char *file) {
         //cross section rendering
         vector<float> temp;
         if(v0.size() == 0) {
-          cout << "PISIDHSUDHSUDH";
+          // cout << "PISIDHSUDHSUDH";
           temp = unitCross(tangent.x,tangent.y,tangent.z, 1,1,1);
         } else {
           temp = unitCross(bTemp[0], bTemp[1], bTemp[2], tangent.x,tangent.y,tangent.z);
@@ -779,10 +812,10 @@ void readSpline(char *file) {
         spineNorms.push_back(norm);
         
         bTemp = unitCross(tangent.x,tangent.y,tangent.z,norm.x,norm.y,norm.z);
-        cout << "Points: " << xCord << " " << yCord << " " << zCord << endl;
-        cout << "Tanget: " << xVar << " " << yVar << " " << zVar << endl;
-        cout << "Nornmal " << temp[0] << " " << temp[1] << " " << temp[2] << endl;
-        cout << "BiNormal: " << bTemp[0] << " " << bTemp[1] << " " << bTemp[2] << endl;
+        // cout << "Points: " << xCord << " " << yCord << " " << zCord << endl;
+        // cout << "Tanget: " << xVar << " " << yVar << " " << zVar << endl;
+        // cout << "Nornmal " << temp[0] << " " << temp[1] << " " << temp[2] << endl;
+        // cout << "BiNormal: " << bTemp[0] << " " << bTemp[1] << " " << bTemp[2] << endl;
 
         //for displaying normals
         normals.push_back(xCord);
@@ -877,39 +910,494 @@ void readSpline(char *file) {
       }
 }
 
-void loadTexture(const char* imgName, GLuint& texHandle) {
-  // create an integer handle for the texture glGenTextures(1, &texHandle);
-  int code = initTexture(imgName, texHandle); 
-  if (code != 0) {
-    cout << "Error loading the texture image.\n";
-    exit(EXIT_FAILURE); 
-  } 
+
+
+void initSky() {
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  //front
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  //right
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  //left
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  //top
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  
+
+  skyVertices.push_back(-containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(-containerSize);
+  
+
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+  skyVertices.push_back(containerSize);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+
+  skyPTex.push_back(0);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(1);
+
+  skyPTex.push_back(1);
+  skyPTex.push_back(0);
+  
+  //top
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // //left
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(0);
+
+
+  // //right
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(0);
+
+  //  //back
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(0);
+
+  //   //back
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(containerSize);
+  // skyVertices.push_back(-containerSize);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(1);
+
+  // skyPTex.push_back(0);
+  // skyPTex.push_back(0);
+
+  // skyPTex.push_back(1);
+  // skyPTex.push_back(0);
+
 }
 
 void initGround() {
-  groundVertices.push_back(-1000);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(-1000);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(-containerSize);
 
-  groundVertices.push_back(1000);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(-1000);
+  groundVertices.push_back(containerSize);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(-containerSize);
 
-  groundVertices.push_back(-1000);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(1000);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(containerSize);
 
-  groundVertices.push_back(1000);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(-1000);
+  groundVertices.push_back(containerSize);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(-containerSize);
 
-  groundVertices.push_back(-1000);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(1000);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(containerSize);
 
-  groundVertices.push_back(1000);
-  groundVertices.push_back(-10);
-  groundVertices.push_back(1000);
+  groundVertices.push_back(containerSize);
+  groundVertices.push_back(-containerSize);
+  groundVertices.push_back(containerSize);
 
   groundPTex.push_back(0);
   groundPTex.push_back(1);
@@ -930,16 +1418,20 @@ void initGround() {
   groundPTex.push_back(0);
 
 }
+
 
 void initScene(int argc, char *argv[])
 {
   
   //HW2
   glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+  loadTexture("sky.jpg", skyTextHandle);
   loadTexture("ground.jpg", groundTextHandle);
   
+  
   readSpline(argv[1]);
-     initGround();
+  initGround();
+  initSky();
   cout << level1Vertices.size();
 
     //level 1 spline
@@ -970,6 +1462,13 @@ void initScene(int argc, char *argv[])
     glBufferSubData(GL_ARRAY_BUFFER, 0,groundVertices.size() * sizeof(float),groundVertices.data());
     glBufferSubData(GL_ARRAY_BUFFER,groundVertices.size() * sizeof(float), groundPTex.size() * sizeof(float), groundPTex.data());
 
+     //textures
+    glGenBuffers(1, &skyVertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, skyVertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, (skyVertices.size()+skyPTex.size()) * sizeof(float), skyVertices.data(), GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,skyVertices.size() * sizeof(float),skyVertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER,skyVertices.size() * sizeof(float), skyPTex.size() * sizeof(float), skyPTex.data());
+
     //BUILDS PIPELINE
     pipelineProgram = new BasicPipelineProgram;
     int ret = pipelineProgram->Init(shaderBasePath);
@@ -989,10 +1488,6 @@ void initScene(int argc, char *argv[])
     GLuint loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "position");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
-    // glBindBuffer(GL_ARRAY_BUFFER, level1ColorVertexBuffer);
-    // loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "color");
-    // glEnableVertexAttribArray(loc);
-    // glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
     glGenVertexArrays(1, &level3VertexArray);
     glBindVertexArray(level3VertexArray);
@@ -1021,7 +1516,6 @@ void initScene(int argc, char *argv[])
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
 
     glGenVertexArrays(1, &level4VertexArray);
-    // glBindTexture(GL_TEXTURE_2D, groundTextHandle);
     glBindVertexArray(level4VertexArray);
     glBindBuffer(GL_ARRAY_BUFFER, level4VertexBuffer);
     loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "position");
@@ -1031,6 +1525,19 @@ void initScene(int argc, char *argv[])
     loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "texCoord");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(groundVertices.size()*sizeof(float)));
+
+     glGenVertexArrays(1, &skyVertexArray);
+    glBindVertexArray(skyVertexArray);
+    glBindBuffer(GL_ARRAY_BUFFER, skyVertexBuffer);
+    loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "position");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+
+    loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "texCoord");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(skyVertices.size()*sizeof(float)));
+
+   
 
 
   glEnable(GL_DEPTH_TEST);

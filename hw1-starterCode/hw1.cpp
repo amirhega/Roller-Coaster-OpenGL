@@ -105,6 +105,7 @@ int countLook =100;
 int uCamera = 0, uCamera2 = 0;
 float ex=0,ey=0,ez=0,fx=0,fy=0,fz=0, ux=0.001,uy=0.001,uz=0.001, bx=0,by=0,bz=0;
 float containerSize = 100;
+float maxHeight = -100;
 
 
 OpenGLMatrix matrix;
@@ -119,7 +120,7 @@ struct Point
   double z;
 };
 
-vector<Point> spineNorms, spineTan, spinePoints;
+vector<Point> spineNorms, spineTan, spinePoints, spineTanUnnorm;
 // spline struct 
 // contains how many control points the spline has, and an array of control points 
 struct Spline 
@@ -396,8 +397,8 @@ void displayFunc()
 
 
   
-  cout << "GROUND: " << groundTextHandle;
-  cout << endl << "SKy: " << skyTextHandle;
+  // cout << "GROUND: " << groundTextHandle;
+  // cout << endl << "SKy: " << skyTextHandle;
  glBindTexture(GL_TEXTURE_2D, skyTextHandle);
 
  
@@ -443,35 +444,45 @@ vector<float> addVectors(float a1,float a2,float a3, float b1, float b2, float b
   return c;
 }
 
+float timeStep = 0.003;
+float g = 9.8;
+float uNew=0.01;
 
 void idleFunc()
 {   
    stall++;
   // do some stuff... 
   //Makes the screenshots
-  // if(stall > 0) {
-  //       if(ones > 9) {
-  //           ones = 0;
-  //           tens++;
-  //       }
-  //       if(tens > 9) {
-  //           tens = 0;
-  //           hundreds++;
-  //       }
-  //       if(hundreds < 3) {
-  //           string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
-  //           char char_array[s.length() + 1];
-  //           strcpy(char_array, s.c_str());
-  //           // saveScreenshot(char_array);
-  //       }
-  //       if(hundreds == 3 && tens == 0 && ones == 0) {
-  //           string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
-  //           char char_array[s.length() + 1];
-  //           strcpy(char_array, s.c_str());
-  //           // saveScreenshot(char_array);
-  //       }
-  // }
+  if(stall > 0) {
+        if(ones > 9) {
+            ones = 0;
+            tens++;
+        }
+        if(tens > 9) {
+            tens = 0;
+            hundreds++;
+        }
+        if(hundreds <= 9) {
+            string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
+            char char_array[s.length() + 1];
+            strcpy(char_array, s.c_str());
+            saveScreenshot(char_array);
+        }
+        if(hundreds == 9 && tens == 9 && ones == 9) {
+            string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
+            char char_array[s.length() + 1];
+            strcpy(char_array, s.c_str());
+            saveScreenshot(char_array);
+        }
+  }
 
+  // if(uCamera2 != 0) {
+  //   uNew = sqrt((2*g*(maxHeight - spinePoints[uCamera2].y)))/unitLength(spineTanUnnorm[uCamera2].x,spineTanUnnorm[uCamera2].y,spineTanUnnorm[uCamera2].z);
+  //   cout << endl << "x: " << spineTanUnnorm[uCamera2].x << " y: " << spineTanUnnorm[uCamera2].y << "z: " << spineTanUnnorm[uCamera2].z << endl;
+  //   cout << "Unit: " << unitLength(spineTanUnnorm[uCamera2].x,spineTanUnnorm[uCamera2].y,spineTanUnnorm[uCamera2].z)<<endl;
+  //   cout << "New: " << uNew;
+  //   uCamera2 += timeStep*uNew; //*uNew;
+  // }
   if(uCamera < level1Vertices.size()-1) {
     ey = spinePoints[uCamera2].y+0.03 * spineNorms[uCamera2].y;
     ex = spinePoints[uCamera2].x+0.03 * spineNorms[uCamera2].x;
@@ -487,7 +498,7 @@ void idleFunc()
     ux = spineNorms[uCamera2].x;
     uy = spineNorms[uCamera2].y;
     uz = spineNorms[uCamera2].z;
-    // cout << "E: "<< ex << " " << ey << " " << ez << " " <<endl;
+    // cout << "E: "<< ex << " " << ey << " " << Gro << " " <<endl;
     // cout << "F: "<< fx << " " << fy << " " << fz << " " <<endl;
     // cout << "U: "<< ux << " " << uy << " " << uz << " " <<endl;
     uCamera2+= 1;
@@ -740,6 +751,56 @@ void readSpline(char *file) {
   Point coord;
   vector<float> v0, v1, v2, v3;
 
+
+
+   for(int i = 0; i < numSplines; i++) {
+    int hasFour = 0;
+    for(int j = 0; j < splines[i].numControlPoints-3; j++) {
+      for (int k = 0; k < 4; k++) { // fill out control matrix with P_k (k = 0 to 3) coefficients info of current spline (splines[i]), current point j
+        C[k][0] = splines[i].points[j + k].x;
+        C[k][1] = splines[i].points[j + k].y;
+        C[k][2] = splines[i].points[j + k].z;
+      }
+
+      double B[4][3];
+      for (int x = 0; x < 4; x++) { // each row of M1
+          for (int y = 0; y < 3; y++) { // each column of M2
+              B[x][y] = 0;
+              for (int z = 0; z < 4; z++) { // each row of M2 - matches col of M1
+                  B[x][y] += M[x][z] * C[z][y];
+              }
+          }
+      }
+
+      for (double u = 0.001; u <= 1.0; u += 0.001) {
+        float xVar, xInd, yVar, yInd, zVar, zInd, xCord, yCord, zCord;
+        xCord = pow(u, 3) * B[0][0] + pow(u, 2) * B[1][0] + pow(u, 1) * B[2][0] + B[3][0];
+       yCord = pow(u, 3) * B[0][1] + pow(u, 2) * B[1][1] + pow(u, 1) * B[2][1] + B[3][1];
+        zCord = pow(u, 3) * B[0][2] + pow(u, 2) * B[1][2] + pow(u, 1) * B[2][2] + B[3][2];
+        Point sP;
+        sP.x = xCord;
+        sP.y = yCord;
+        sP.z = zCord;
+        if(yCord > maxHeight) maxHeight = yCord;
+        // cout << yCord << endl;
+
+        //Tangents
+        xVar = ((3*pow(u, 2)) * B[0][0]) + ((2*u)* B[1][0]) + B[2][0];
+        yVar = ((3*pow(u, 2)) * B[0][1]) + ((2*u)* B[1][1]) + B[2][1];
+        zVar = ((3*pow(u, 2)) * B[0][2]) + ((2*u)* B[1][2]) + B[2][2];
+
+        Point unNorm;
+        unNorm.x = xVar;
+        unNorm.y = yVar;
+        unNorm.z = zVar;
+        spineTanUnnorm.push_back(unNorm);
+      }
+
+    }
+   }
+
+   
+
   for(int i = 0; i < numSplines; i++) {
     int hasFour = 0;
     for(int j = 0; j < splines[i].numControlPoints-3; j++) {
@@ -760,7 +821,10 @@ void readSpline(char *file) {
       }
 
       coord.x = coord.y = coord.z = 0.0;
-      for (double u = 0.001; u <= 1.0; u += 0.01) {
+      
+      
+      for (double u = 0.001; u < 1.0; u += uNew) {
+        cout << "u: "<<u << endl;
         float xVar, xInd, yVar, yInd, zVar, zInd, xCord, yCord, zCord;
         xCord = pow(u, 3) * B[0][0] + pow(u, 2) * B[1][0] + pow(u, 1) * B[2][0] + B[3][0];
         yCord = pow(u, 3) * B[0][1] + pow(u, 2) * B[1][1] + pow(u, 1) * B[2][1] + B[3][1];
@@ -773,6 +837,7 @@ void readSpline(char *file) {
         level1Vertices.push_back(xCord);
         level1Vertices.push_back(yCord);
         level1Vertices.push_back(zCord);
+        if(sP.y > maxHeight) maxHeight = sP.y;
 
         //Tangents
         xVar = ((3*pow(u, 2)) * B[0][0]) + ((2*u)* B[1][0]) + B[2][0];
@@ -782,6 +847,11 @@ void readSpline(char *file) {
 
         //check this, might be doing unit twice
         float tangentLength = sqrt(pow(xVar,2)+pow(yVar,2)+pow(zVar,2));
+        Point unNorm;
+        unNorm.x = xVar;
+        unNorm.y = yVar;
+        unNorm.z = zVar;
+        spineTanUnnorm.push_back(unNorm);
         if(tangentLength != 0) {
           xVar /= tangentLength;
           yVar /= tangentLength;
@@ -842,6 +912,19 @@ void readSpline(char *file) {
         vector<float> v6 = addVectors(xCord, yCord, zCord, alpha*nPlusb2[0], alpha*nPlusb2[1], alpha*nPlusb2[2]);              
         vector<float> v7 = addVectors(xCord, yCord, zCord, alpha*nPlusb3[0], alpha*nPlusb3[1], alpha*nPlusb3[2]);
 
+        // v4[0] -= 0.02;
+        // v4[1] -= 0.02;
+        // v4[2] -= 0.02;
+        // v5[0] -= 0.02;
+        // v5[1] -= 0.02;
+        // v5[2] -= 0.02;
+        // v6[0] -= 0.02;
+        // v6[1] -= 0.02;
+        // v6[2] -= 0.02;
+        // v7[0] -= 0.02;
+        // v7[1] -= 0.02;
+        // v7[2] -= 0.02;
+
         if(v0.size() != 0) {
           //first traingle: v0 in this case is v4. triangle is v0,v1,v4
           leftTrianglesVertices1.push_back(v6);
@@ -900,6 +983,15 @@ void readSpline(char *file) {
         v1 = v5;
         v2 = v6;
         v3 = v7;
+
+
+        //  cout << endl << "x: " << unNorm.x << " y: " << unNorm.y << "z: " << unNorm.z << endl;
+        // cout << "Unit: " << unitLength(unNorm.x,unNorm.y,unNorm.z)<<endl;
+        //   cout << "New: " << maxHeight;
+        uNew = timeStep * sqrt((2*g*(maxHeight - yCord)))/unitLength(unNorm.x,unNorm.y,unNorm.z);
+        cout << uNew << endl;
+        // if(u + uNew > 1) break;
+        if(uNew == 0) uNew = 0.001;
       }
     }
 }

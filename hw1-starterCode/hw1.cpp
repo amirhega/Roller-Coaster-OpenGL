@@ -65,30 +65,30 @@ GLuint linesVertexBuffer, linesColorVertexBuffer;
 GLuint linesVertexArray;
 GLuint wireFrameVertexBuffer, wireFrameColorVertexBuffer; 
 GLuint wireFrameVertexArray;
-GLuint trianglesVertexBuffer, trianglesColorVertexBuffer; 
+GLuint trianglesVertexBuffer, trianglesColorVertexBuffer, trianglesVertexBuffer1, trianglesColorVertexBuffer1, trianglesVertexBuffer2, trianglesColorVertexBuffer2; 
 GLuint sTrianglesVertexBuffer, sTrianglesColorVertexBuffer;
 GLuint trianglesVertexArray;
 GLuint sTrianglesVertexArray;
-GLuint leftTrianglesVertexBuffer, leftTrianglesColorVertexBuffer; 
+GLuint leftTrianglesVertexBuffer, leftTrianglesColorVertexBuffer,leftTrianglesVertexBuffer1,leftTrianglesVertexBuffer2; 
 GLuint rightTrianglesVertexBuffer, rightTrianglesColorVertexBuffer; 
 GLuint upTrianglesVertexBuffer, upTrianglesColorVertexBuffer; 
 GLuint downTrianglesVertexBuffer, downTrianglesColorVertexBuffer; 
 GLuint level1VertexBuffer, level1ColorVertexBuffer, binormalsVertexBuffer, normalsVertexBuffer;
-GLuint level1VertexArray, level3VertexArray, normalsVertexArray, binormalsVertexArray;
+GLuint level1VertexArray, level3VertexArray, level3VertexArray1, level3VertexArray2,normalsVertexArray, binormalsVertexArray;
 GLuint level4VertexArray, level4VertexBuffer;
 GLuint skyVertexArray, skyVertexBuffer;
 
-GLuint groundTextHandle, skyTextHandle;
+GLuint groundTextHandle, skyTextHandle, railTextHandle;
 
 
-vector<vector<float> > leftTrianglesVertices1;
-vector<float> leftTriangleColors;
+vector<vector<float> > leftTrianglesVertices1,leftTrianglesVertices2,leftTrianglesVertices3;
+vector<float> leftTriangleColors,leftTriangleColors1,leftTriangleColors2;
 vector<vector<float> > rightTrianglesVertices1, rightTriangleColors;
 vector<vector<float> > upTrianglesVertices1, upTriangleColors;
 vector<vector<float> > downTrianglesVertices1, downTriangleColors;
 vector<float> leftTrianglesVertices;
 vector<float> rightTrianglesVertices;
-vector<float> upTrianglesVertices;
+vector<float> cTrianglesVertices;
 vector<float> downTrianglesVertices;
 vector<float> wireFrameVertices, wireFrameColors;
 vector<float> level1Vertices, level1Color;
@@ -102,10 +102,11 @@ vector<float> skyVertices, skyPTex;
 int hundreds = 0, tens = 0, ones = 0;
 int stall = 0;
 int countLook =100;
-int uCamera = 0, uCamera2 = 0;
+float uCamera = 1, uCamera2 = 0;
 float ex=0,ey=0,ez=0,fx=0,fy=0,fz=0, ux=0.001,uy=0.001,uz=0.001, bx=0,by=0,bz=0;
 float containerSize = 100;
 float maxHeight = -100;
+float beta = 0.03;
 
 
 OpenGLMatrix matrix;
@@ -270,16 +271,31 @@ int initTexture(const char * imageFilename, GLuint textureHandle)
 // write a screenshot to the specified filename
 void saveScreenshot(const char * filename)
 {
-  unsigned char * screenshotData = new unsigned char[windowWidth * windowHeight * 3];
-  glReadPixels(0, 0, windowWidth, windowHeight, GL_RGB, GL_UNSIGNED_BYTE, screenshotData);
+  int scale = 2;
+  int ww = windowWidth * scale;
+  int hh = windowHeight * scale;
+  unsigned char * screenshotData = new unsigned char[ww * hh * 3];
+  glReadPixels(0, 0, ww, hh, GL_RGB, GL_UNSIGNED_BYTE, screenshotData);
 
-  ImageIO screenshotImg(windowWidth, windowHeight, 3, screenshotData);
+  unsigned char * screenshotData1 = new unsigned char[windowWidth * windowHeight * 3];
+  for (int h = 0; h < windowHeight; h++) {
+    for (int w = 0; w < windowWidth; w++) {
+      int h1 = h * scale;
+      int w1 = w * scale;
+      screenshotData1[(h * windowWidth + w) * 3] = screenshotData[(h1 * ww + w1) * 3];
+      screenshotData1[(h * windowWidth + w) * 3 + 1] = screenshotData[(h1 * ww + w1) * 3 + 1];
+      screenshotData1[(h * windowWidth + w) * 3 + 2] = screenshotData[(h1 * ww + w1) * 3 + 2];
+    }
+  }
+
+  ImageIO screenshotImg(windowWidth, windowHeight, 3, screenshotData1);
 
   if (screenshotImg.save(filename, ImageIO::FORMAT_JPEG) == ImageIO::OK)
     cout << "File " << filename << " saved successfully." << endl;
   else cout << "Failed to save file " << filename << '.' << endl;
 
   delete [] screenshotData;
+  delete [] screenshotData1;
 }
 
 void loadTexture(const char* imgName, GLuint& texHandle) {
@@ -293,6 +309,7 @@ void loadTexture(const char* imgName, GLuint& texHandle) {
   } 
 }
 
+//for multiple textures
 void setTextureUnit(GLint unit) {
   GLuint program = texturePipelineProgram->GetProgramHandle();
   glActiveTexture(unit); // select texture unit affected by subsequent texture calls
@@ -310,9 +327,7 @@ void displayFunc()
 
   matrix.SetMatrixMode(OpenGLMatrix::ModelView);
   matrix.LoadIdentity();
-  matrix.LookAt(ex, ey, ez, fx, fy, fz, ux, uy, uz);
-    // matrix.LookAt(0, 0, 5, 0, 0, 0, 0, 1, 0);
-    //  matrix.LookAt(13.5939, -0.0539935, 0.56969, 0, 0, 0, 0, 1, 0);
+  matrix.LookAt(ex, ey, ez, fx, fy, fz, ux, uy, uz); //changes by idle func
   
   //light
   pipelineProgram->Bind();
@@ -328,14 +343,16 @@ void displayFunc()
   GLint La = glGetUniformLocation(program, "La");
   GLint Ld = glGetUniformLocation(program, "Ld");
   GLint Ls = glGetUniformLocation(program, "Ls");
+  //silver
   float mat_ambient[] ={ 0.23125f, 0.23125f, 0.23125f, 1.0f };
   float mat_diffuse[] ={0.2775f, 0.2775f, 0.2775f, 1.0f };
   float mat_specular[] ={0.773911f, 0.773911f, 0.773911f, 1.0f };
+  
   float shine =51.2f ;
-  float light_ambient[] = {0.5f,0.5f,0.5f,1.0f};//{ 0.24725f, 0.1995f, 0.0745f, 1.0f };
+  float light_ambient[] = {0.8f,0.8f,0.8f,1.0f};//{ 0.24725f, 0.1995f, 0.0745f, 1.0f };
   float light_diffuse[] = {0.75164f, 0.75164f, 0.75164f, 1.0f };
   float light_specular[] = {0.5f,0.5f,0.5,1.0f};//{0.628281f, 0.555802f, 0.366065f, 1.0f };
-  // float lightDirection[3] = {0,1,0};
+  // light direction
   float lightDirection[3] = { 0, 1, 0 }; // the “Sun” at noon 
   float viewLightDirection[3]; // light direction in the view space 
   // the following line is pseudo-code: 
@@ -370,19 +387,20 @@ void displayFunc()
   matrix.SetMatrixMode(OpenGLMatrix::Projection);
   matrix.GetMatrix(p);
   
-  // bind shader
-  
-
   // set variable
   pipelineProgram->SetModelViewMatrix(m);
   pipelineProgram->SetProjectionMatrix(p);
 
   // glBindVertexArray(level1VertexArray);
   // glDrawArrays(GL_LINE_STRIP, 0, level1Vertices.size()/3);
-  glBindVertexArray(level3VertexArray);
-  glDrawArrays(GL_TRIANGLES, 0, rightTrianglesVertices.size()/3+leftTrianglesVertices.size()/3+upTrianglesVertices.size()/3+downTrianglesVertices.size()/3);
+  
 
-  // texturePipelineProgram->Bind();
+   glBindVertexArray(level3VertexArray1);
+  glDrawArrays(GL_TRIANGLES, 0, leftTrianglesVertices.size()/3);
+   glBindVertexArray(level3VertexArray2);
+  glDrawArrays(GL_TRIANGLES, 0, rightTrianglesVertices.size()/3);
+
+  // texture pipeline
   texturePipelineProgram->Bind();
 
   // set variable
@@ -396,18 +414,15 @@ void displayFunc()
   glBindVertexArray(0);
 
 
-  
-  // cout << "GROUND: " << groundTextHandle;
-  // cout << endl << "SKy: " << skyTextHandle;
- glBindTexture(GL_TEXTURE_2D, skyTextHandle);
-
- 
-
-   glBindVertexArray(skyVertexArray);
+  glBindTexture(GL_TEXTURE_2D, skyTextHandle);
+  glBindVertexArray(skyVertexArray);
   glDrawArrays(GL_TRIANGLES, 0, skyVertices.size()/3);
   glBindVertexArray(0);
-
- 
+  
+  glBindTexture(GL_TEXTURE_2D, railTextHandle);
+  glBindVertexArray(level3VertexArray);
+  glDrawArrays(GL_TRIANGLES, 0, cTrianglesVertices.size()/3);
+  glBindVertexArray(0);
   // glBindVertexArray(normalsVertexArray);
   // glDrawArrays(GL_LINES, 0, normals.size()/2);
   // glBindVertexArray(binormalsVertexArray);
@@ -432,6 +447,10 @@ vector<float> unitCross(float a1,float a2,float a3, float b1, float b2, float b3
     c[0] /= length;
     c[1] /= length;
     c[2] /= length;
+  } else {
+    c[0] = 0;
+    c[1] = 0;
+    c[2] = 0;
   }
   return c;
 }
@@ -453,37 +472,31 @@ void idleFunc()
    stall++;
   // do some stuff... 
   //Makes the screenshots
-  if(stall > 0) {
-        if(ones > 9) {
-            ones = 0;
-            tens++;
-        }
-        if(tens > 9) {
-            tens = 0;
-            hundreds++;
-        }
-        if(hundreds <= 9) {
-            string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
-            char char_array[s.length() + 1];
-            strcpy(char_array, s.c_str());
-            saveScreenshot(char_array);
-        }
-        if(hundreds == 9 && tens == 9 && ones == 9) {
-            string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
-            char char_array[s.length() + 1];
-            strcpy(char_array, s.c_str());
-            saveScreenshot(char_array);
-        }
-  }
-
-  // if(uCamera2 != 0) {
-  //   uNew = sqrt((2*g*(maxHeight - spinePoints[uCamera2].y)))/unitLength(spineTanUnnorm[uCamera2].x,spineTanUnnorm[uCamera2].y,spineTanUnnorm[uCamera2].z);
-  //   cout << endl << "x: " << spineTanUnnorm[uCamera2].x << " y: " << spineTanUnnorm[uCamera2].y << "z: " << spineTanUnnorm[uCamera2].z << endl;
-  //   cout << "Unit: " << unitLength(spineTanUnnorm[uCamera2].x,spineTanUnnorm[uCamera2].y,spineTanUnnorm[uCamera2].z)<<endl;
-  //   cout << "New: " << uNew;
-  //   uCamera2 += timeStep*uNew; //*uNew;
+  // if(stall > 0) {
+  //       if(ones > 9) {
+  //           ones = 0;
+  //           tens++;
+  //       }
+  //       if(tens > 9) {
+  //           tens = 0;
+  //           hundreds++;
+  //       }
+  //       if(hundreds <= 9) {
+  //           string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
+  //           char char_array[s.length() + 1];
+  //           strcpy(char_array, s.c_str());
+  //           saveScreenshot(char_array);
+  //       }
+  //       if(hundreds == 9 && tens == 9 && ones == 9) {
+  //           string s = "images/" + to_string(hundreds) + to_string(tens)+ to_string(ones++) + ".jpg";
+  //           char char_array[s.length() + 1];
+  //           strcpy(char_array, s.c_str());
+  //           saveScreenshot(char_array);
+  //       }
   // }
-  if(uCamera < level1Vertices.size()-1) {
+
+  
+  if(uCamera2 < spinePoints.size()-1) {
     ey = spinePoints[uCamera2].y+0.03 * spineNorms[uCamera2].y;
     ex = spinePoints[uCamera2].x+0.03 * spineNorms[uCamera2].x;
     ez = spinePoints[uCamera2].z+0.03 * spineNorms[uCamera2].z;
@@ -494,14 +507,11 @@ void idleFunc()
     fx = tanx+ex;
     fy = tany+ey;
     fz = tanz+ez;
-
+    //normal
     ux = spineNorms[uCamera2].x;
     uy = spineNorms[uCamera2].y;
     uz = spineNorms[uCamera2].z;
-    // cout << "E: "<< ex << " " << ey << " " << Gro << " " <<endl;
-    // cout << "F: "<< fx << " " << fy << " " << fz << " " <<endl;
-    // cout << "U: "<< ux << " " << uy << " " << uz << " " <<endl;
-    uCamera2+= 1;
+    uCamera2+= 1*uCamera;
   }
   // for example, here, you can save the screenshots to disk (to make the animation)
     // saveScreenshot("temp.jpg");
@@ -686,6 +696,19 @@ void keyboardFunc(unsigned char key, int x, int y)
       controlState = TRANSLATE;
     break;
 
+    case 'r':
+      uCamera2 = 0;
+    break;
+
+    case 'f':
+      uCamera += 0.5;
+    break;
+
+    case 'g':
+      if(uCamera >= 1.5)
+        uCamera -= 0.5;
+    break;
+
     case 27: // ESC key
       exit(0); // exit the program
     break;
@@ -708,22 +731,45 @@ vector<float> calculateNormal(vector<float>& a, vector<float>& b ,vector<float>&
   return unitCross(v1[0],v1[1],v1[2], v2[0],v2[1],v2[2]);
 }
 
-void addTriangleColor(vector<float> color) {
-  // cout << color[0] << endl;
-  leftTriangleColors.push_back(color[0]);
-  leftTriangleColors.push_back(color[1]);
-  leftTriangleColors.push_back(color[2]);
-  // leftTriangleColors.push_back(1.0f);
+void addTriangleColor(int n1,int n2,int n3, int n4, int n5, int n6) {
+  leftTriangleColors.push_back(n1);
+  leftTriangleColors.push_back(n2);
+  leftTriangleColors.push_back(n3);
 
-  leftTriangleColors.push_back(color[0]);
-  leftTriangleColors.push_back(color[1]);
-  leftTriangleColors.push_back(color[2]);
-  // leftTriangleColors.push_back(1.0f);
+  leftTriangleColors.push_back(n4);
+  leftTriangleColors.push_back(n5);
+  leftTriangleColors.push_back(n6);
+}
 
-  leftTriangleColors.push_back(color[0]);
-  leftTriangleColors.push_back(color[1]);
-  leftTriangleColors.push_back(color[2]);  
-  // leftTriangleColors.push_back(1.0f);
+void addTriangleColor1(vector<float> color) {
+  //left rail for phong shading
+  leftTriangleColors1.push_back(color[0]);
+  leftTriangleColors1.push_back(color[1]);
+  leftTriangleColors1.push_back(color[2]);
+  
+  leftTriangleColors1.push_back(color[0]);
+  leftTriangleColors1.push_back(color[1]);
+  leftTriangleColors1.push_back(color[2]);
+
+  leftTriangleColors1.push_back(color[0]);
+  leftTriangleColors1.push_back(color[1]);
+  leftTriangleColors1.push_back(color[2]);  
+}
+
+void addTriangleColor2(vector<float> color) {
+  //right rail for phong shading
+  leftTriangleColors2.push_back(color[0]);
+  leftTriangleColors2.push_back(color[1]);
+  leftTriangleColors2.push_back(color[2]);
+  
+  leftTriangleColors2.push_back(color[0]);
+  leftTriangleColors2.push_back(color[1]);
+  leftTriangleColors2.push_back(color[2]);
+  
+  leftTriangleColors2.push_back(color[0]);
+  leftTriangleColors2.push_back(color[1]);
+  leftTriangleColors2.push_back(color[2]);  
+  
 }
 
 double s = 0.5;
@@ -749,10 +795,10 @@ void readSpline(char *file) {
 
   double C[4][3];
   Point coord;
-  vector<float> v0, v1, v2, v3;
+  vector<float> v0, v1, v2, v3,v0left, v1left, v2left, v3left, v0right, v1right, v2right, v3right;
 
 
-
+    //solely for getting max height
    for(int i = 0; i < numSplines; i++) {
     int hasFour = 0;
     for(int j = 0; j < splines[i].numControlPoints-3; j++) {
@@ -799,7 +845,8 @@ void readSpline(char *file) {
     }
    }
 
-   
+    int numSkips =0;
+      int count = numSkips;
 
   for(int i = 0; i < numSplines; i++) {
     int hasFour = 0;
@@ -821,11 +868,9 @@ void readSpline(char *file) {
       }
 
       coord.x = coord.y = coord.z = 0.0;
-      
-      
       for (double u = 0.001; u < 1.0; u += uNew) {
-        cout << "u: "<<u << endl;
         float xVar, xInd, yVar, yInd, zVar, zInd, xCord, yCord, zCord;
+        //position
         xCord = pow(u, 3) * B[0][0] + pow(u, 2) * B[1][0] + pow(u, 1) * B[2][0] + B[3][0];
         yCord = pow(u, 3) * B[0][1] + pow(u, 2) * B[1][1] + pow(u, 1) * B[2][1] + B[3][1];
         zCord = pow(u, 3) * B[0][2] + pow(u, 2) * B[1][2] + pow(u, 1) * B[2][2] + B[3][2];
@@ -837,6 +882,7 @@ void readSpline(char *file) {
         level1Vertices.push_back(xCord);
         level1Vertices.push_back(yCord);
         level1Vertices.push_back(zCord);
+        //physically accurate
         if(sP.y > maxHeight) maxHeight = sP.y;
 
         //Tangents
@@ -845,8 +891,8 @@ void readSpline(char *file) {
         zVar = ((3*pow(u, 2)) * B[0][2]) + ((2*u)* B[1][2]) + B[2][2];
 
 
-        //check this, might be doing unit twice
         float tangentLength = sqrt(pow(xVar,2)+pow(yVar,2)+pow(zVar,2));
+        //unNorm needed for it to bephysically accurate
         Point unNorm;
         unNorm.x = xVar;
         unNorm.y = yVar;
@@ -867,10 +913,10 @@ void readSpline(char *file) {
         xInd = xCam.size()-1;
         spineTan.push_back(tangent);
 
-        //cross section rendering
+        //normal calc
         vector<float> temp;
+        //if this is the first time
         if(v0.size() == 0) {
-          // cout << "PISIDHSUDHSUDH";
           temp = unitCross(tangent.x,tangent.y,tangent.z, 1,1,1);
         } else {
           temp = unitCross(bTemp[0], bTemp[1], bTemp[2], tangent.x,tangent.y,tangent.z);
@@ -879,13 +925,27 @@ void readSpline(char *file) {
         norm.x =temp[0];
         norm.y =temp[1];
         norm.z =temp[2];
+         //adjust if all 0 to buffer it
+        if(temp[0] == 0 && temp[1] == 0 && temp[2] == 0) {
+          temp[0] = 0.0001;
+          temp[1] = 0.00001;
+          temp[2] = 0.0001;
+        }
+        
         spineNorms.push_back(norm);
         
+        //binrmal calc
         bTemp = unitCross(tangent.x,tangent.y,tangent.z,norm.x,norm.y,norm.z);
-        // cout << "Points: " << xCord << " " << yCord << " " << zCord << endl;
-        // cout << "Tanget: " << xVar << " " << yVar << " " << zVar << endl;
-        // cout << "Nornmal " << temp[0] << " " << temp[1] << " " << temp[2] << endl;
-        // cout << "BiNormal: " << bTemp[0] << " " << bTemp[1] << " " << bTemp[2] << endl;
+        //adjust if all 0 to buffer it
+         if(bTemp[0] == 0 && bTemp[1] == 0 && bTemp[2] == 0) {
+          bTemp[0] = 0.0001;
+          bTemp[1] = 0.00001;
+          bTemp[2] = 0.0001;
+        }
+         cout << "Points: " << xCord << " " << yCord << " " << zCord << endl;
+              cout << "Tanget: " << xVar << " " << yVar << " " << zVar << endl;
+              cout << "Nornmal " << temp[0] << " " << temp[1] << " " << temp[2] << endl;
+              cout << "BiNormal: " << bTemp[0] << " " << bTemp[1] << " " << bTemp[2] << endl;
 
         //for displaying normals
         normals.push_back(xCord);
@@ -895,6 +955,7 @@ void readSpline(char *file) {
         normals.push_back(yCord+temp[1]);
         normals.push_back(zCord+temp[2]);
 
+        //for displaying binormal
         binormal.push_back(xCord);
         binormal.push_back(yCord);
         binormal.push_back(zCord);
@@ -902,103 +963,272 @@ void readSpline(char *file) {
         binormal.push_back(yCord+bTemp[1]);
         binormal.push_back(zCord+bTemp[2]);
 
+        //determine vertices of a side
         vector<float> nPlusb = addVectors(-norm.x,-norm.y,-norm.z, bTemp[0], bTemp[1], bTemp[2]);
         vector<float> nPlusb1 = addVectors(norm.x,norm.y,norm.z, bTemp[0], bTemp[1], bTemp[2]);
         vector<float> nPlusb2 = addVectors(norm.x,norm.y,norm.z, -bTemp[0], -bTemp[1], -bTemp[2]);
         vector<float> nPlusb3 = addVectors(-norm.x,-norm.y,-norm.z, -bTemp[0], -bTemp[1], -bTemp[2]);
-        float alpha = 0.01;
+        float alpha = 0.009;
         vector<float> v4 = addVectors(xCord, yCord, zCord, alpha*nPlusb[0], alpha*nPlusb[1], alpha*nPlusb[2]);              
         vector<float> v5 = addVectors(xCord, yCord, zCord, alpha*nPlusb1[0], alpha*nPlusb1[1], alpha*nPlusb1[2]);              
         vector<float> v6 = addVectors(xCord, yCord, zCord, alpha*nPlusb2[0], alpha*nPlusb2[1], alpha*nPlusb2[2]);              
         vector<float> v7 = addVectors(xCord, yCord, zCord, alpha*nPlusb3[0], alpha*nPlusb3[1], alpha*nPlusb3[2]);
+        vector<float> v4right = v4;
+        vector<float> v5right = v5;
+        vector<float> v6right = v6;
+        vector<float> v7right = v7;
+        vector<float> v4left = v4;
+        vector<float> v5left = v5;
+        vector<float> v6left = v6;
+        vector<float> v7left = v7;
 
-        // v4[0] -= 0.02;
-        // v4[1] -= 0.02;
-        // v4[2] -= 0.02;
-        // v5[0] -= 0.02;
-        // v5[1] -= 0.02;
-        // v5[2] -= 0.02;
-        // v6[0] -= 0.02;
-        // v6[1] -= 0.02;
-        // v6[2] -= 0.02;
-        // v7[0] -= 0.02;
-        // v7[1] -= 0.02;
-        // v7[2] -= 0.02;
+        cout << xCord <<endl;
+        //left rail
+        v4left[0] -= beta*bTemp[0];
+        v4left[1] -= beta*bTemp[1];
+        v4left[2] -= beta*bTemp[2];
+        v5left[0] -= beta*bTemp[0];
+        v5left[1] -= beta*bTemp[1];
+        v5left[2] -= beta*bTemp[2];
 
+        //right rail
+        v6right[0] += beta*bTemp[0];
+        v6right[1] += beta*bTemp[1];
+        v6right[2] += beta*bTemp[2];
+        v7right[0] += beta*bTemp[0];
+        v7right[1] += beta*bTemp[1];
+        v7right[2] += beta*bTemp[2];
+        cout << "BiNormal: " << v7[0] << " " << v7[1] << " " << v7[2] << endl;
+
+        //not first one so we can draw triangles
         if(v0.size() != 0) {
+        //crossbar (make thinner)
+          v0[0] += 0.01*temp[0];
+          v0[1] += 0.01*temp[1];
+          v0[2] += 0.01*temp[2];
+          v3[0] += 0.01*temp[0];
+          v3[1] += 0.01*temp[1];
+          v3[2] += 0.01*temp[2];
+          if(count == 0) {
+            //one side
+            leftTrianglesVertices1.push_back(v6);
+            leftTrianglesVertices1.push_back(v2);
+            leftTrianglesVertices1.push_back(v1);
+            addTriangleColor(0,1,0,0,1,0);
+
+            leftTrianglesVertices1.push_back(v6);
+            leftTrianglesVertices1.push_back(v5);
+            leftTrianglesVertices1.push_back(v1);
+            addTriangleColor(0,1,1,1,1,0);
+
+            //one side
+            leftTrianglesVertices1.push_back(v5);
+            leftTrianglesVertices1.push_back(v1);
+            leftTrianglesVertices1.push_back(v0);
+            addTriangleColor(0,1,1,1,1,0);
+
+            leftTrianglesVertices1.push_back(v5);
+            leftTrianglesVertices1.push_back(v4);
+            leftTrianglesVertices1.push_back(v0);
+            addTriangleColor(0,1,1,1,1,0);
+
+            //one side
+            leftTrianglesVertices1.push_back(v7);
+            leftTrianglesVertices1.push_back(v3);
+            leftTrianglesVertices1.push_back(v0);
+            addTriangleColor(0,1,1,1,1,0);
+
+            leftTrianglesVertices1.push_back(v7);
+            leftTrianglesVertices1.push_back(v4);
+            leftTrianglesVertices1.push_back(v0);
+            addTriangleColor(0,1,1,1,1,0);
+
+
+            leftTrianglesVertices1.push_back(v6);
+            leftTrianglesVertices1.push_back(v2);
+            leftTrianglesVertices1.push_back(v3);
+            addTriangleColor(0,1,1,1,1,0);
+
+            leftTrianglesVertices1.push_back(v6);
+            leftTrianglesVertices1.push_back(v7);
+            leftTrianglesVertices1.push_back(v3);
+            addTriangleColor(0,1,1,1,1,0);
+
+            //front 
+            leftTrianglesVertices1.push_back(v1);
+            leftTrianglesVertices1.push_back(v2);
+            leftTrianglesVertices1.push_back(v3);
+            addTriangleColor(1,1,0,1,0,0);
+
+            leftTrianglesVertices1.push_back(v1);
+            leftTrianglesVertices1.push_back(v0);
+            leftTrianglesVertices1.push_back(v3);
+             addTriangleColor(1,1,1,0,0,0);
+
+
+            count = numSkips;
+          } else if(count > 0) {
+            count--;
+          }
+
+          //LEFT RAIL
+          leftTrianglesVertices2.push_back(v6left);
+          leftTrianglesVertices2.push_back(v2left);
+          leftTrianglesVertices2.push_back(v1left);
+          vector<float> clr = calculateNormal(v6left,v2left,v1left);
+          addTriangleColor1(clr);
+
+          leftTrianglesVertices2.push_back(v6left);
+          leftTrianglesVertices2.push_back(v5left);
+          leftTrianglesVertices2.push_back(v1left);
+          clr = calculateNormal(v1left,v5left,v6left);
+          addTriangleColor1(clr);
+
+
+          leftTrianglesVertices2.push_back(v5left);
+          leftTrianglesVertices2.push_back(v1left);
+          leftTrianglesVertices2.push_back(v0left);
+          clr = calculateNormal(v5left,v1left, v0left);
+          addTriangleColor1(clr);
+
+          leftTrianglesVertices2.push_back(v5left);
+          leftTrianglesVertices2.push_back(v4left);
+          leftTrianglesVertices2.push_back(v0left);
+          clr = calculateNormal(v0left,v4left,v5left);
+          addTriangleColor1(clr);
+
+
+          leftTrianglesVertices2.push_back(v7left);
+          leftTrianglesVertices2.push_back(v3left);
+          leftTrianglesVertices2.push_back(v0left);
+          clr = calculateNormal(v7left,v3left,v0left);
+          addTriangleColor1(clr);
+
+          leftTrianglesVertices2.push_back(v7left);
+          leftTrianglesVertices2.push_back(v4left);
+          leftTrianglesVertices2.push_back(v0left);
+          clr = calculateNormal(v0left,v4left,v7left);
+          addTriangleColor1(clr);
+
+
+          leftTrianglesVertices2.push_back(v6left);
+          leftTrianglesVertices2.push_back(v2left);
+          leftTrianglesVertices2.push_back(v3left);
+          clr = calculateNormal(v6left,v2left,v3left);
+          addTriangleColor1(clr);
+
+          leftTrianglesVertices2.push_back(v6left);
+          leftTrianglesVertices2.push_back(v7left);
+          leftTrianglesVertices2.push_back(v3left);
+          clr = calculateNormal(v3left,v7left,v6left);
+          addTriangleColor1(clr);
+
+          //Right
           //first traingle: v0 in this case is v4. triangle is v0,v1,v4
-          leftTrianglesVertices1.push_back(v6);
-          leftTrianglesVertices1.push_back(v2);
-          leftTrianglesVertices1.push_back(v1);
-          vector<float> clr = calculateNormal(v6,v2,v1);
-          addTriangleColor(clr);
+          leftTrianglesVertices3.push_back(v6right);
+          leftTrianglesVertices3.push_back(v2right);
+          leftTrianglesVertices3.push_back(v1right);
+          clr = calculateNormal(v6right,v2right,v1right);
+          addTriangleColor2(clr);
 
-          leftTrianglesVertices1.push_back(v6);
-          leftTrianglesVertices1.push_back(v5);
-          leftTrianglesVertices1.push_back(v1);
-          clr = calculateNormal(v1,v5,v6);
-          addTriangleColor(clr);
-
-
-          leftTrianglesVertices1.push_back(v5);
-          leftTrianglesVertices1.push_back(v1);
-          leftTrianglesVertices1.push_back(v0);
-          clr = calculateNormal(v5,v1, v0);
-          addTriangleColor(clr);
-
-          leftTrianglesVertices1.push_back(v5);
-          leftTrianglesVertices1.push_back(v4);
-          leftTrianglesVertices1.push_back(v0);
-          clr = calculateNormal(v0,v4,v5);
-          addTriangleColor(clr);
+          leftTrianglesVertices3.push_back(v6right);
+          leftTrianglesVertices3.push_back(v5right);
+          leftTrianglesVertices3.push_back(v1right);
+          clr = calculateNormal(v1right,v5right,v6right);
+          addTriangleColor2(clr);
 
 
-          leftTrianglesVertices1.push_back(v7);
-          leftTrianglesVertices1.push_back(v3);
-          leftTrianglesVertices1.push_back(v0);
-          clr = calculateNormal(v7,v3,v0);
-          addTriangleColor(clr);
+          leftTrianglesVertices3.push_back(v5right);
+          leftTrianglesVertices3.push_back(v1right);
+          leftTrianglesVertices3.push_back(v0right);
+          clr = calculateNormal(v5right,v1right, v0right);
+          addTriangleColor2(clr);
 
-          leftTrianglesVertices1.push_back(v7);
-          leftTrianglesVertices1.push_back(v4);
-          leftTrianglesVertices1.push_back(v0);
-          clr = calculateNormal(v0,v4,v7);
-          addTriangleColor(clr);
+          leftTrianglesVertices3.push_back(v5right);
+          leftTrianglesVertices3.push_back(v4right);
+          leftTrianglesVertices3.push_back(v0right);
+          clr = calculateNormal(v0right,v4right,v5right);
+          addTriangleColor2(clr);
 
 
-          leftTrianglesVertices1.push_back(v6);
-          leftTrianglesVertices1.push_back(v2);
-          leftTrianglesVertices1.push_back(v3);
-          clr = calculateNormal(v6,v2,v3);
-          addTriangleColor(clr);
+          leftTrianglesVertices3.push_back(v7right);
+          leftTrianglesVertices3.push_back(v3right);
+          leftTrianglesVertices3.push_back(v0right);
+          clr = calculateNormal(v7right,v3right,v0right);
+          addTriangleColor2(clr);
 
-          leftTrianglesVertices1.push_back(v6);
-          leftTrianglesVertices1.push_back(v7);
-          leftTrianglesVertices1.push_back(v3);
-          clr = calculateNormal(v3,v7,v6);
-          addTriangleColor(clr);
+          leftTrianglesVertices3.push_back(v7right);
+          leftTrianglesVertices3.push_back(v4right);
+          leftTrianglesVertices3.push_back(v0right);
+          clr = calculateNormal(v0right,v4right,v7left);
+          addTriangleColor2(clr);
+
+
+          leftTrianglesVertices3.push_back(v6right);
+          leftTrianglesVertices3.push_back(v2right);
+          leftTrianglesVertices3.push_back(v3right);
+          clr = calculateNormal(v6right,v2right,v3left);
+          addTriangleColor2(clr);
+
+          leftTrianglesVertices3.push_back(v6right);
+          leftTrianglesVertices3.push_back(v7right);
+          leftTrianglesVertices3.push_back(v3right);
+          clr = calculateNormal(v3right,v7right,v6right);
+          addTriangleColor2(clr);
         }
         
+        //update squares
         v0 = v4;
         v1 = v5;
         v2 = v6;
         v3 = v7;
 
+        v0left = v4left;
+        v1left = v5left;
+        v2left = v6left;
+        v3left = v7left;
 
-        //  cout << endl << "x: " << unNorm.x << " y: " << unNorm.y << "z: " << unNorm.z << endl;
-        // cout << "Unit: " << unitLength(unNorm.x,unNorm.y,unNorm.z)<<endl;
-        //   cout << "New: " << maxHeight;
-        uNew = timeStep * sqrt((2*g*(maxHeight - yCord)))/unitLength(unNorm.x,unNorm.y,unNorm.z);
-        cout << uNew << endl;
-        // if(u + uNew > 1) break;
+        v0right = v4right;
+        v1right = v5right;
+        v2right = v6right;
+        v3right = v7right;
+
+
+       //physics equation to make it accurate
+        float oldNew = uNew;
+        
+        uNew = timeStep * sqrt((2*g*(maxHeight - yCord)))/unitLength(xCord+unNorm.x,yCord+unNorm.y,zCord+unNorm.z);
         if(uNew == 0) uNew = 0.001;
+        cout << "new: " << uNew << endl;
+        if(uNew < 0.0004) uNew = 0.0004;
+
       }
     }
 }
+      //cause gaps in cross road
+      numSkips = 2*12*4;
+      count = numSkips;
       for(int i = 0; i < leftTrianglesVertices1.size(); i++) {
-        leftTrianglesVertices.push_back(leftTrianglesVertices1[i][0]);
-        leftTrianglesVertices.push_back(leftTrianglesVertices1[i][1]);
-        leftTrianglesVertices.push_back(leftTrianglesVertices1[i][2]);
+        if(count >0) {
+        cTrianglesVertices.push_back(leftTrianglesVertices1[i][0]);
+        cTrianglesVertices.push_back(leftTrianglesVertices1[i][1]);
+        cTrianglesVertices.push_back(leftTrianglesVertices1[i][2]);
+        
+        } 
+        count--;
+        if(count <= -numSkips) count = numSkips;
+      }
+
+      for(int i = 0; i < leftTrianglesVertices2.size(); i++) {
+        leftTrianglesVertices.push_back(leftTrianglesVertices2[i][0]);
+        leftTrianglesVertices.push_back(leftTrianglesVertices2[i][1]);
+        leftTrianglesVertices.push_back(leftTrianglesVertices2[i][2]);
+      }
+
+      for(int i = 0; i < leftTrianglesVertices3.size(); i++) {
+        rightTrianglesVertices.push_back(leftTrianglesVertices3[i][0]);
+        rightTrianglesVertices.push_back(leftTrianglesVertices3[i][1]);
+        rightTrianglesVertices.push_back(leftTrianglesVertices3[i][2]);
       }
 }
 
@@ -1158,6 +1388,7 @@ void initSky() {
   skyVertices.push_back(containerSize);
   skyVertices.push_back(containerSize);
 
+  //texture coord
   skyPTex.push_back(0);
   skyPTex.push_back(1);
 
@@ -1247,222 +1478,6 @@ void initSky() {
 
   skyPTex.push_back(1);
   skyPTex.push_back(0);
-  
-  //top
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // //left
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(0);
-
-
-  // //right
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(0);
-
-  //  //back
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(0);
-
-  //   //back
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(containerSize);
-  // skyVertices.push_back(-containerSize);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(1);
-
-  // skyPTex.push_back(0);
-  // skyPTex.push_back(0);
-
-  // skyPTex.push_back(1);
-  // skyPTex.push_back(0);
 
 }
 
@@ -1517,9 +1532,9 @@ void initScene(int argc, char *argv[])
   
   //HW2
   glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+  loadTexture("wood.jpg", railTextHandle);
   loadTexture("sky.jpg", skyTextHandle);
   loadTexture("ground.jpg", groundTextHandle);
-  
   
   readSpline(argv[1]);
   initGround();
@@ -1531,13 +1546,36 @@ void initScene(int argc, char *argv[])
     glBindBuffer(GL_ARRAY_BUFFER, level1VertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(level1Vertices[0]) * level1Vertices.size(), &level1Vertices[0], GL_STATIC_DRAW);
 
+    //cross section
     glGenBuffers(1, &leftTrianglesVertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(leftTrianglesVertices[0]) * leftTrianglesVertices.size(), leftTrianglesVertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cTrianglesVertices[0]) * cTrianglesVertices.size(), cTrianglesVertices.data(), GL_STATIC_DRAW);
 
      glGenBuffers(1, &trianglesColorVertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(leftTriangleColors[0]) * leftTriangleColors.size(), &leftTriangleColors[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, (cTrianglesVertices.size()+leftTriangleColors.size()) * sizeof(float), cTrianglesVertices.data(), GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,cTrianglesVertices.size() * sizeof(float),cTrianglesVertices.data());
+    glBufferSubData(GL_ARRAY_BUFFER,cTrianglesVertices.size() * sizeof(float), leftTriangleColors.size() * sizeof(float), leftTriangleColors.data());
+
+    //left rail
+     glGenBuffers(1, &leftTrianglesVertexBuffer1);
+    glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer1);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(leftTrianglesVertices[0]) * leftTrianglesVertices.size(), leftTrianglesVertices.data(), GL_STATIC_DRAW);
+
+     glGenBuffers(1, &trianglesColorVertexBuffer1);
+    glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer1);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(leftTriangleColors1[0]) * leftTriangleColors1.size(), &leftTriangleColors1[0], GL_STATIC_DRAW);
+
+    //right rail
+     glGenBuffers(1, &leftTrianglesVertexBuffer2);
+    glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(rightTrianglesVertices[0]) * rightTrianglesVertices.size(), rightTrianglesVertices.data(), GL_STATIC_DRAW);
+
+     glGenBuffers(1, &trianglesColorVertexBuffer2);
+    glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(leftTriangleColors2[0]) * leftTriangleColors2.size(), &leftTriangleColors2[0], GL_STATIC_DRAW);
+
+    
 
     glGenBuffers(1, &normalsVertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, normalsVertexBuffer);
@@ -1584,10 +1622,32 @@ void initScene(int argc, char *argv[])
     glGenVertexArrays(1, &level3VertexArray);
     glBindVertexArray(level3VertexArray);
     glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer);
-    loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "position");
+    loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "position");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
     glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer);
+     loc = glGetAttribLocation(texturePipelineProgram->GetProgramHandle(), "texCoord");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 2, GL_FLOAT, GL_FALSE, 0, (const void*)(size_t)(cTrianglesVertices.size()*sizeof(float)));
+
+    glGenVertexArrays(1, &level3VertexArray1);
+    glBindVertexArray(level3VertexArray1);
+    glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer1);
+    loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "position");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+    glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer1);
+    loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "normal");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+
+    glGenVertexArrays(1, &level3VertexArray2);
+    glBindVertexArray(level3VertexArray2);
+    glBindBuffer(GL_ARRAY_BUFFER, leftTrianglesVertexBuffer2);
+    loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "position");
+    glEnableVertexAttribArray(loc);
+    glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
+    glBindBuffer(GL_ARRAY_BUFFER, trianglesColorVertexBuffer2);
     loc = glGetAttribLocation(pipelineProgram->GetProgramHandle(), "normal");
     glEnableVertexAttribArray(loc);
     glVertexAttribPointer(loc, 3, GL_FLOAT, GL_FALSE, 0, (const void *)0);
